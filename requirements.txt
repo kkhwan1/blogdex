@@ -1,0 +1,15 @@
+# 브라우저 자동화
+selenium==4.15.2
+webdriver-manager==4.0.1
+undetected-chromedriver==3.5.4
+
+# 환경변수 관리
+python-dotenv==1.0.0
+
+# API 서버
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.10.0
+
+# ngrok 터널링
+pyngrok==7.0.5
