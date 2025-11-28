@@ -189,12 +189,29 @@ def login_google(driver):
         
         # 비밀번호 입력
         try:
-            password_input = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
+            password_input = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password'][name='Passwd']"))
             )
-            driver.execute_script(f"arguments[0].value = '{password}';", password_input)
-            time.sleep(2)
-        except:
+            time.sleep(1)
+            
+            # 클릭하여 포커스
+            password_input.click()
+            time.sleep(0.5)
+            
+            # JavaScript로 값 설정 및 이벤트 트리거
+            driver.execute_script("""
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+            """, password_input, password)
+            time.sleep(1)
+            
+            # 추가로 직접 입력도 시도
+            password_input.clear()
+            password_input.send_keys(password)
+            time.sleep(1)
+        except Exception as e:
+            print(f"[ERROR] 비밀번호 입력 실패: {e}")
             return False
         
         # 다음 버튼
@@ -228,23 +245,44 @@ def extract_blog_grade(driver, blog_url):
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
-            time.sleep(2)  # 페이지 안정화 대기
+            # 조건부 대기: body 요소가 완전히 로드될 때까지
+            WebDriverWait(driver, 5).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
             logger.info("✅ BlogDex 홈페이지 로딩 완료")
 
-        # 마우스 스크롤
+        # 마우스 스크롤 (최소화)
         actions = ActionChains(driver)
         actions.move_by_offset(0, 10).perform()
-        time.sleep(1)
+        time.sleep(0.3)  # 1초 → 0.3초로 단축
 
-        # 🔥 Phase 4: 메인 검색 필드만 정확히 타겟팅 (디버그 스크립트 결과 기반)
-        #  [Input 1] - placeholder="블로그 주소/아이디를 입력하세요.", class contains w-[310px], md:w-[450px], lg:w-[550px]
+        # 🔥 사용자 요청: URL 입력 전 강제 새로고침
+        logger.info("🔄 페이지 강제 새로고침 중...")
+        driver.refresh()
+        # 조건부 대기: 새로고침 후 입력 필드가 준비될 때까지 대기
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#__next > div > main > div > div.flex.w-full.space-x-2 > div > input"))
+            )
+            logger.info("✅ 새로고침 완료 (입력 필드 준비됨)")
+        except:
+            # 입력 필드를 찾지 못하면 고정 대기
+            time.sleep(2)
+            logger.info("✅ 새로고침 완료 (고정 대기)")
+
+        # 🔥 Phase 5: 사용자 제공 정확한 셀렉터 사용
+        # 사용자 제공 셀렉터: #__next > div > main > div > div.flex.w-full.space-x-2 > div > input
         url_input_selectors = [
-            # 메인 검색 필드 - 정확한 placeholder 텍스트
+            # 사용자 제공 정확한 셀렉터 (최우선)
+            "#__next > div > main > div > div.flex.w-full.space-x-2 > div > input",
+            # 약간 변형된 셀렉터 (백업)
+            "#__next div.flex.w-full.space-x-2 input",
+            "div.flex.w-full.space-x-2 input",
+            # 클래스 기반
+            "input.h-14[placeholder='블로그 주소/아이디를 입력하세요.']",
+            "input.w-\\[310px\\][placeholder='블로그 주소/아이디를 입력하세요.']",
+            # placeholder 기반 (백업)
             "input[placeholder='블로그 주소/아이디를 입력하세요.']",
-            # 너비 클래스로 구분 (w-[310px])
-            "input.h-14[type='text']",  # h-14 클래스도 메인 필드의 특징
-            # placeholder 부분 일치 (두 번째 입력 필드와 구분하기 위해 더 구체적)
-            "input[type='text'][placeholder*='블로그 주소/아이디']",
             # 구조 기반 백업
             "main section input[type='text']",
             "main input[placeholder]"
@@ -253,38 +291,47 @@ def extract_blog_grade(driver, blog_url):
         url_input = None
         for selector in url_input_selectors:
             try:
-                # 🔥 Codex 제안: visibility_of_element_located 사용 (hidden 요소 재시도)
-                url_input = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
+                # 요소가 존재할 때까지 대기
+                url_input = WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                 )
-                # 추가 확인: 상호작용 가능한지 검증
-                if url_input.is_enabled():
-                    logger.info(f"✅ URL 입력 필드 찾음: {selector[:50]}...")
-                    break
-                else:
-                    url_input = None
-                    continue
+                logger.info(f"✅ URL 입력 필드 찾음: {selector[:60]}...")
+                break
             except Exception as e:
-                logger.debug(f"❌ URL 입력 필드 셀렉터 실패: {selector[:30]}... - {str(e)[:30]}")
+                logger.debug(f"❌ URL 입력 필드 셀렉터 실패: {selector[:40]}... - {str(e)[:30]}")
                 continue
 
         if not url_input:
             logger.error("❌ 모든 URL 입력 필드 셀렉터 실패")
             raise Exception("URL 입력 필드를 찾을 수 없음")
 
-        url_input.clear()
+        # 🔥 사용자 요청: 더블 클릭으로 필드 활성화 → 입력 → Enter
+        logger.info("📍 URL 입력 필드 더블 클릭 중...")
+        
+        # ActionChains를 사용한 더블 클릭
+        actions = ActionChains(driver)
+        actions.move_to_element(url_input).double_click().perform()
+        time.sleep(0.3)  # 0.5초 → 0.3초로 단축
+        
+        # 추가로 한 번 더 클릭하여 확실히 포커스
         url_input.click()
+        time.sleep(0.2)  # 0.3초 → 0.2초로 단축
+        
+        logger.info("⌨️ URL 입력 중...")
+        url_input.clear()
+        # clear 후 대기 제거 (즉시 입력)
         url_input.send_keys(blog_url)
-
+        
         # React 이벤트 트리거
         driver.execute_script("""
             arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
             arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
         """, url_input)
-
-        time.sleep(0.5)
-
-        # 🔥 새로운 방식: Enter 키로 검색 실행 (검색 버튼 클릭 로직 제거)
+        
+        time.sleep(0.2)  # 0.5초 → 0.2초로 단축
+        
+        # Enter 키 입력
+        logger.info("⏎ Enter 키 입력 중...")
         from selenium.webdriver.common.keys import Keys
         url_input.send_keys(Keys.RETURN)
         logger.info("✅ Enter 키 입력 완료 (검색 실행)")
@@ -298,15 +345,26 @@ def extract_blog_grade(driver, blog_url):
         except Exception as e:
             logger.warning(f"⚠️ 페이지 렌더링 대기 타임아웃 (계속 진행): {str(e)[:50]}")
 
-        # 🔥 Codex 제안: 추가 안정화 대기 증가 (2초 → 5초, BlogDex React 렌더링 완료 대기)
-        time.sleep(5)
+        # 🔥 Codex 제안: 추가 안정화 대기 증가 (5초 → 8초, BlogDex React 렌더링 완료 대기)
+        time.sleep(8)
 
         # 🔥 SVG text 셀렉터 최적화 (속성 기반)
+        # 사용자 제공 정보: font-family="Pretendard", font-size="22px", font-weight="700", fill="#e27d13"
+        # SVG text 요소: <text font-family="Pretendard" font-size="22px" font-weight="700" fill="#e27d13" x="-30" y="-60">최적1+</text>
         grade_selectors = [
+            # 가장 정확한 셀렉터 (사용자 제공 정보 기반 - 모든 속성 매칭)
+            "svg text[font-family='Pretendard'][font-size='22px'][font-weight='700'][fill='#e27d13']",
+            "svg text[font-family='Pretendard'][font-size='22px'][font-weight='700']",
+            "svg text[font-size='22px'][font-weight='700']",
+            "svg text[fill='#e27d13'][font-size='22px']",
+            "svg text[font-family='Pretendard'][font-size='22px']",
             # 속성 기반 셀렉터 (가장 안정적 - Pretendard 폰트 사용)
             "svg text[font-family='Pretendard']",
             "svg text[font-weight='700']",
             "svg text[font-size='22px']",
+            # fill 색상 기반 (주황색 #e27d13)
+            "svg text[fill='#e27d13']",
+            "svg text[fill*='e27d13']",
             # nth-child 기반 (기존 방식)
             "svg > text:nth-child(2)",
             "div[class*='justify-center'] svg > text:nth-child(2)",
@@ -319,14 +377,18 @@ def extract_blog_grade(driver, blog_url):
         grade_element = None
         last_error = None
 
-        logger.info(f"⏱️  등급 요소 대기 시작 (최대 30초)")
+        logger.info(f"⏱️  등급 요소 대기 시작 (최대 40초)")
         for idx, selector in enumerate(grade_selectors, 1):
             try:
                 logger.debug(f"🔍 등급 셀렉터 {idx}/{len(grade_selectors)} 시도: {selector[:50]}...")
-                # 🔥 중요: 대기 시간 10초 → 30초로 증가 (BlogDex 로딩 시간 고려)
-                grade_element = WebDriverWait(driver, 30, poll_frequency=0.5).until(
-                    EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
+                # 🔥 중요: 대기 시간 30초 → 40초로 증가 (BlogDex 로딩 시간 고려)
+                grade_element = WebDriverWait(driver, 40, poll_frequency=0.5).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                 )
+                # 요소가 보이는지 확인
+                if not grade_element.is_displayed():
+                    logger.warning(f"⚠️ 등급 요소가 숨겨져 있음, 계속 시도...")
+                    continue
                 logger.info(f"✅ 등급 셀렉터 {idx} 성공!")
                 break
             except Exception as e:
@@ -613,40 +675,91 @@ def crawl_blog_grade(url: str) -> dict:
         return response_data
     finally:
         if driver:
-            # 1단계: 정상 종료 시도
+            # 드라이버 PID 저장 (해당 프로세스만 종료하기 위해)
+            driver_pid = None
+            chrome_pid = None
+            
+            try:
+                if hasattr(driver, 'service') and driver.service.process:
+                    driver_pid = driver.service.process.pid
+                    # Chrome 프로세스 PID 찾기 (자식 프로세스)
+                    try:
+                        import psutil
+                        try:
+                            driver_process = psutil.Process(driver_pid)
+                            children = driver_process.children(recursive=True)
+                            for child in children:
+                                if 'chrome' in child.name().lower():
+                                    chrome_pid = child.pid
+                                    break
+                        except:
+                            pass
+                    except ImportError:
+                        # psutil이 없으면 chrome_pid는 None으로 유지
+                        pass
+            except:
+                pass
+            
+            # 1단계: 정상 종료 시도 (해당 창만 닫기)
             try:
                 driver.quit()
                 print("[INFO] Chrome 정상 종료")
             except Exception as e:
                 print(f"[ERROR] driver.quit() 실패: {e}")
 
-            # 2단계: 프로세스 강제 종료
+            # 2단계: 특정 프로세스만 강제 종료 (다른 Chrome 창은 유지)
             try:
-                if hasattr(driver, 'service') and driver.service.process:
-                    pid = driver.service.process.pid
-                    driver.service.process.kill()
-                    print(f"[INFO] Chrome 프로세스 강제 종료 (PID: {pid})")
+                # psutil 사용 시도
+                try:
+                    import psutil
+                    psutil_available = True
+                except ImportError:
+                    psutil_available = False
+                    print("[INFO] psutil 없음 - driver.quit()만 사용 (다른 Chrome 창 보호)")
+                
+                if psutil_available and driver_pid:
+                    try:
+                        # chromedriver 프로세스만 종료
+                        driver_process = psutil.Process(driver_pid)
+                        if driver_process.is_running():
+                            driver_process.terminate()
+                            try:
+                                driver_process.wait(timeout=3)
+                                print(f"[INFO] ChromeDriver 프로세스 종료 (PID: {driver_pid})")
+                            except psutil.TimeoutExpired:
+                                driver_process.kill()
+                                print(f"[INFO] ChromeDriver 프로세스 강제 종료 (PID: {driver_pid})")
+                    except psutil.NoSuchProcess:
+                        pass
+                    except Exception as e:
+                        print(f"[WARNING] ChromeDriver 프로세스 종료 실패: {e}")
+                    
+                    # 해당 스크립트가 실행한 Chrome 프로세스만 종료
+                    if chrome_pid:
+                        try:
+                            chrome_process = psutil.Process(chrome_pid)
+                            if chrome_process.is_running():
+                                chrome_process.terminate()
+                                try:
+                                    chrome_process.wait(timeout=3)
+                                    print(f"[INFO] Chrome 프로세스 종료 (PID: {chrome_pid})")
+                                except psutil.TimeoutExpired:
+                                    chrome_process.kill()
+                                    print(f"[INFO] Chrome 프로세스 강제 종료 (PID: {chrome_pid})")
+                        except psutil.NoSuchProcess:
+                            pass
+                        except Exception as e:
+                            print(f"[WARNING] Chrome 프로세스 종료 실패: {e}")
+                elif hasattr(driver, 'service') and driver.service.process and not psutil_available:
+                    # psutil이 없을 경우: driver.service.process만 종료 (안전)
+                    try:
+                        pid = driver.service.process.pid
+                        driver.service.process.kill()
+                        print(f"[INFO] ChromeDriver 프로세스 종료 (PID: {pid})")
+                    except Exception as e:
+                        print(f"[WARNING] 프로세스 종료 실패: {e}")
             except Exception as e:
-                print(f"[ERROR] 프로세스 kill 실패: {e}")
-
-            # 3단계: OS 레벨 정리 (Windows)
-            try:
-                import os
-                import subprocess
-                if os.name == 'nt':  # Windows
-                    subprocess.run(
-                        ['taskkill', '/F', '/IM', 'chrome.exe', '/T'],
-                        capture_output=True,
-                        timeout=5
-                    )
-                    subprocess.run(
-                        ['taskkill', '/F', '/IM', 'chromedriver.exe', '/T'],
-                        capture_output=True,
-                        timeout=5
-                    )
-                    print("[INFO] Chrome 프로세스 OS 레벨 정리 완료")
-            except Exception as e:
-                print(f"[ERROR] OS 레벨 정리 실패: {e}")
+                print(f"[ERROR] 프로세스 종료 중 예외: {e}")
 
 
 def crawl_blog_grade_with_pool(url: str) -> dict:

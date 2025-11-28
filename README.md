@@ -27,8 +27,10 @@
 pip install -r requirements.txt
 
 # 2. 환경변수 설정
-cp .env.example .env
-# .env 파일을 편집하여 구글 계정 정보 입력
+# .env 파일을 생성하고 구글 계정 정보를 입력하세요
+# 예시:
+# GOOGLE_EMAIL=your-email@gmail.com
+# GOOGLE_PASSWORD=your-password
 ```
 
 ## 🚀 사용 방법
@@ -116,23 +118,6 @@ python blogdex_selenium_login.py https://blog.naver.com/nyang2ne/224038751161
 - ✅ 쿠키 자동 저장/재사용
 - ✅ JSON 파일로 결과 저장
 
----
-
-### 방법 3: BlogDex 사이트 열기
-
-```bash
-# 간단한 버전
-python simple_blogdex_opener.py
-
-# 고급 버전 (자동화 감지 방지 포함)
-python open_blogdex.py
-```
-
-**특징**:
-- BlogDex 사이트 자동 열기
-- ChromeDriver 자동 설치
-- 자동화 감지 방지 (고급 버전)
-
 ## ⚙️ 환경변수 설정
 
 `.env` 파일 예시:
@@ -189,29 +174,24 @@ HEADLESS=false
 ## 📁 파일 구조
 
 ```
-블랜크(서버용)/
+진행용_blogdex/
 ├── api_server.py          # FastAPI 서버 ⭐
 ├── crawler.py             # 크롤링 모듈 ⭐
 ├── start_server.py        # 로컬 서버 실행 ⭐
 ├── start_server_ngrok.py  # 외부 접속 서버 (ngrok) ⭐
-├── test_api.py            # API 테스트 스크립트 ⭐
-├── blogdex_selenium_login.py  # 메인 스크립트
-├── open_blogdex.py        # 사이트 열기 스크립트
+├── blogdex_selenium_login.py  # 메인 스크립트 (직접 실행용)
+├── result_store.py        # 결과 저장 모듈 ⭐
+├── driver_pool.py         # 드라이버 풀 관리 ⭐
 ├── .env                   # 환경변수 (gitignore)
 ├── requirements.txt       # Python 의존성
 ├── cookies.pkl            # 세션 쿠키 (자동 생성)
-├── README.md             # 이 파일
+├── README.md              # 이 파일
 ├── API_사용안내.md        # API 상세 가이드 ⭐
 └── data/
     └── json_results/      # 크롤링 결과 저장
 ```
 
 ## 🔧 문제 해결
-
-### ChromeDriver 타임아웃
-**증상**: 실행 시 30초 타임아웃
-
-**해결**: `scraper_improved.py` 사용 (타임아웃 120초 + 재시도)
 
 ### 구글 로그인 실패
 **증상**: "브라우저가 안전하지 않습니다"
@@ -236,7 +216,6 @@ tail -f scraper.log
 - [x] API 문서 자동 생성 (Swagger)
 
 ### 📋 향후 계획
-- [ ] pytest 테스트 케이스
 - [ ] 웹 대시보드
 - [ ] Docker 컨테이너화
 - [ ] 데이터베이스 연동
@@ -245,8 +224,6 @@ tail -f scraper.log
 ## 📚 추가 문서
 
 - [`API_사용안내.md`](API_사용안내.md) - FastAPI 서버 사용 가이드 ⭐
-- [`.claude/CLAUDE.md`](.claude/CLAUDE.md) - Claude Code 가이드
-- `.env.example` - 환경변수 템플릿
 
 ## 📄 라이선스
 

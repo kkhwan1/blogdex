@@ -1,0 +1,13 @@
+{
+  "url": "https://blog.naver.com/djusti",
+  "blog_id": "djusti",
+  "grade": null,
+  "timestamp": "2025-11-28 03:44:17",
+  "success": false,
+  "level": null,
+  "level_en": null,
+  "tier": null,
+  "tier_en": null,
+  "tier_rank": null,
+  "error": "등급 추출 실패 (3회 재시도 소진)"
+}
